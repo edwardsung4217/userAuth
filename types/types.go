@@ -10,7 +10,7 @@ import (
 )
 
 type Payload struct {
-	user    string
+	address string
 	message []byte
 }
 
@@ -20,13 +20,20 @@ type Server struct {
 	quitch     chan struct{}
 	msgch      chan Payload
 	shutdown   bool
+	user       User
+}
+type User struct {
+	Username string
+	Password string
+	ID       int
 }
 
-func NewServer(listenAddr string) *Server {
+func NewServer(listenAddr string, user User) *Server {
 	return &Server{
 		listenAddr: listenAddr,
 		quitch:     make(chan struct{}),
 		msgch:      make(chan Payload, 10),
+		user:       user,
 	}
 }
 func (s *Server) Start() error {
@@ -35,8 +42,11 @@ func (s *Server) Start() error {
 		return err
 	}
 	s.ln = ln
-
-	go s.acceptLoop() // Start accepting connections in a goroutine
+	if !authUser(s.user) {
+		fmt.Printf("not correct usernameor password")
+	} else {
+		go s.acceptLoop() // Start accepting connections in a goroutine
+	}
 
 	// Wait for a signal to gracefully shut down the server
 	signalCh := make(chan os.Signal, 1)
@@ -92,7 +102,7 @@ func (s *Server) readLoop(conn net.Conn) {
 		// msg := buf[:n]
 		// fmt.Println(string(msg))
 		s.msgch <- Payload{
-			user:    conn.RemoteAddr().String(),
+			address: conn.RemoteAddr().String(),
 			message: buf[:n],
 		}
 	}
@@ -111,12 +121,19 @@ func (s *Server) Shutdown() {
 	}
 	// You can add additional cleanup code here if necessary
 }
-
+func authUser(user User) bool {
+	if user.Username == "123" && user.Password == "123" {
+		fmt.Print("1")
+		return true
+	}
+	fmt.Print("2")
+	return false
+}
 func (s *Server) GetMsgChannel() <-chan Payload {
 	return s.msgch
 }
-func (p *Payload) GetUser() string {
-	return p.user
+func (p *Payload) GetAddress() string {
+	return p.address
 }
 func (p *Payload) GetMessage() []byte {
 	return p.message
